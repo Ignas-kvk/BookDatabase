@@ -1,0 +1,57 @@
+<!DOCTYPE html>
+<html lang="lt">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Book Library</title>
+</head>
+<body>
+    <h1>Library Books</h1>
+    <table border="1">
+        <thead>
+            <tr>
+                <th>ID</th>
+                <th>Title</th>
+                <th>Author</th>
+                <th>Genre</th>
+                <th>Published Date</th>
+                <th>Availability</th>
+                <th>Borrow</th>
+            </tr>
+        </thead>
+        <tbody id="book-table"></tbody>
+    </table>
+
+    <script>
+        fetch("http://localhost:3000/books")
+        .then(response => response.json())
+        .then(data => {
+            const table = document.getElementById("book-table");
+            data.forEach(book => {
+                const row = `<tr>
+                    <td>${book.id}</td>
+                    <td>${book.title}</td>
+                    <td>${book.author}</td>
+                    <td>${book.genre}</td>
+                    <td>${book.published_date}</td>
+                    <td>${book.availability ? "Available" : "Checked Out"}</td>
+                    <td><button onclick="borrowBook(${book.id})">Borrow</button></td>
+                </tr>`;
+                table.innerHTML += row;
+            });
+        })
+        .catch(error => console.error("Error fetching books:", error));
+
+        function borrowBook(bookId) {
+            fetch("http://localhost:3000/borrow", {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({ user_id: 1, book_id: bookId })
+            })
+            .then(response => response.json())
+            .then(data => alert(data.message))
+            .catch(error => console.error("Error borrowing book:", error));
+        }
+    </script>
+</body>
+</html>
