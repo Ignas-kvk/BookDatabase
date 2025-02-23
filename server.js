@@ -2,6 +2,8 @@ const express = require("express");
 const mysql = require("mysql2");
 const cors = require("cors");
 const path = require("path");
+const bcrypt = require("bcryptjs");
+const jwt = require("jsonwebtoken");
 require("dotenv").config();
 
 const app = express();
@@ -9,16 +11,17 @@ const PORT = 3000;
 
 // Middleware
 app.use(cors());
-app.use(express.json()); // JSON support
-app.use("/images", express.static(path.join(__dirname, "public/images"))); // Serve images
+app.use(express.json());
+app.use(express.static(path.join(__dirname, "public")));
+
 
 // MySQL Connection
 const db = mysql.createConnection({
   host: "localhost",
-  user: "root", // Change if needed
-  password: "", // Change if needed
+  user: "root", 
+  password: "", 
   database: "book",
-  charset: "utf8mb4", // Supports Lithuanian characters
+  charset: "utf8mb4", 
 });
 
 db.connect((err) => {
@@ -29,123 +32,151 @@ db.connect((err) => {
   console.log("✅ Connected to MySQL Database");
 });
 
-// 📌 Get all books with genre and cover image
+// 📌 Serve Signup Page
+app.get("/signup", (req, res) => {
+  res.sendFile(path.join(__dirname, "public", "signup.html"));
+});
+
+// 📌 Serve Login Page
+app.get("/login", (req, res) => {
+  res.sendFile(path.join(__dirname, "public", "login.html"));
+});
+
+// 📌 Sign Up (Register User)
+app.post("/signup", async (req, res) => {
+  const { name, email, password } = req.body;
+
+  db.query("SELECT * FROM user WHERE email = ?", [email], async (err, result) => {
+    if (err) {
+      console.error("❌ Database error:", err);
+      return res.status(500).json({ error: "Database error" });
+    }
+    
+    if (result.length > 0) {
+      return res.status(400).json({ error: "User already exists!" });
+    }
+
+    try {
+      const hashedPassword = await bcrypt.hash(password, 10);
+      const query = "INSERT INTO user (name, email, password) VALUES (?, ?, ?)";
+      db.query(query, [name, email, hashedPassword], (err) => {
+        if (err) {
+          console.error("❌ Error signing up:", err);
+          return res.status(500).json({ error: "Database error" });
+        }
+        res.json({ message: "User registered successfully!" });
+      });
+    } catch (error) {
+      console.error("❌ Error hashing password:", error);
+      return res.status(500).json({ error: "Error processing request" });
+    }
+  });
+});
+
+// 📌 Login (Authenticate User)
+app.post("/login", (req, res) => {
+  const { email, password } = req.body;
+
+  db.query("SELECT * FROM user WHERE email = ?", [email], async (err, result) => {
+    if (err) {
+      console.error("❌ Database error:", err);
+      return res.status(500).json({ error: "Database error" });
+    }
+
+    if (result.length === 0) {
+      return res.status(400).json({ error: "Invalid email or password!" });
+    }
+
+    try {
+      const user = result[0];
+      const isMatch = await bcrypt.compare(password, user.password);
+      if (!isMatch) {
+        return res.status(400).json({ error: "Invalid email or password!" });
+      }
+
+      const token = jwt.sign(
+        { id: user.id, email: user.email },
+        "your_secret_key",
+        { expiresIn: "1h" }
+      );
+
+      res.json({ message: "Login successful!", token });
+    } catch (error) {
+      console.error("❌ Error during login:", error);
+      return res.status(500).json({ error: "Error processing request" });
+    }
+  });
+});
+app.post("/login", (req, res) => {
+  const { email, password } = req.body;
+
+  db.query("SELECT * FROM user WHERE email = ?", [email], async (err, result) => {
+    if (err) {
+      console.error("❌ Database error:", err);
+      return res.status(500).json({ error: "Database error" });
+    }
+
+    if (result.length === 0) {
+      return res.status(400).json({ error: "Invalid email or password!" });
+    }
+
+    try {
+      // Compare Password
+      const user = result[0];
+      const isMatch = await bcrypt.compare(password, user.password);
+      if (!isMatch) {
+        return res.status(400).json({ error: "Invalid email or password!" });
+      }
+
+      // Generate JWT Token
+      const token = jwt.sign(
+        { id: user.id, email: user.email },
+        "your_secret_key",
+        { expiresIn: "1h" }
+      );
+
+      res.json({ message: "Login successful!", token });
+    } catch (error) {
+      console.error("❌ Error during login:", error);
+      return res.status(500).json({ error: "Error processing request" });
+    }
+  });
+});
 app.get("/books", (req, res) => {
   const query = `
-    SELECT book.id, book.title, book.author, genre.name AS genre, 
-           book.published_date, book.availability, book.image_url
-    FROM book 
-    JOIN genre ON book.genre = genre.id
-    LIMIT 20;
+      SELECT book.id, book.title, book.author, genre.name AS genre, 
+             book.published_date, book.availability, book.image_url, book.description
+      FROM book 
+      JOIN genre ON book.genre = genre.id
+      LIMIT 20;
   `;
 
   db.query(query, (err, results) => {
-    if (err) {
-      console.error("❌ Error fetching books:", err.sqlMessage || err);
-      return res.status(500).json({ error: err.sqlMessage || "Database error" });
-    }
+      if (err) {
+          console.error("❌ Error fetching books:", err.sqlMessage || err);
+          return res.status(500).json({ error: err.sqlMessage || "Database error" });
+      }
 
-    // Append full image URL for each book
-    results = results.map(book => ({
-      ...book,
-      image_url: book.image_url ? `http://localhost:${PORT}/images/${book.image_url}` : null,
-    }));
+      // ✅ Ensure correct image URL format
+      results = results.map(book => ({
+          ...book,
+          image_url: `http://localhost:3000/images/${path.basename(book.image_url)}` // Fix URL
+      }));
 
-    res.json(results);
+      res.json(results);
   });
 });
 
+// Middleware: Serve images with CORS headers
+app.use("/images", (req, res, next) => {
+  res.setHeader("Access-Control-Allow-Origin", "*");
+  res.setHeader("Access-Control-Allow-Methods", "GET");
+  res.setHeader("Access-Control-Allow-Headers", "Content-Type");
+  next();
+}, express.static(path.join(__dirname, "public/images")));
 
-// 📌 Get all genres
-app.get("/genres", (req, res) => {
-  db.query("SELECT * FROM genre", (err, results) => {
-    if (err) {
-      console.error("❌ Error fetching genres:", err);
-      return res.status(500).json({ error: "Database error" });
-    }
-    res.json(results);
-  });
-});
 
-// 📌 Get all users
-app.get("/users", (req, res) => {
-  db.query("SELECT id, email, name FROM user", (err, results) => {
-    if (err) {
-      console.error("❌ Error fetching users:", err);
-      return res.status(500).json({ error: "Database error" });
-    }
-    res.json(results);
-  });
-});
-
-// 📌 Borrow a book
-app.post("/borrow", (req, res) => {
-  const { user_id, book_id } = req.body;
-  const borrowDate = new Date().toISOString().split("T")[0]; // Current date
-
-  const query = `
-    INSERT INTO borrowing (user_id, book_id, borrow_date) 
-    VALUES (?, ?, ?);
-  `;
-
-  db.query(query, [user_id, book_id, borrowDate], (err, result) => {
-    if (err) {
-      console.error("❌ Error borrowing book:", err);
-      return res.status(500).json({ error: "Failed to borrow book" });
-    }
-    res.json({ message: "Book borrowed successfully!" });
-  });
-});
-
-// 📌 Get borrowed books for a user
-app.get("/borrowed/:user_id", (req, res) => {
-  const { user_id } = req.params;
-
-  const query = `
-    SELECT book.id, book.title, book.author, borrowing.borrow_date, 
-           borrowing.return_date, book.cover_image
-    FROM borrowing 
-    JOIN book ON borrowing.book_id = book.id 
-    WHERE borrowing.user_id = ?;
-  `;
-
-  db.query(query, [user_id], (err, results) => {
-    if (err) {
-      console.error("❌ Error fetching borrowed books:", err);
-      return res.status(500).json({ error: "Database error" });
-    }
-
-    // Append full image path
-    results = results.map(book => ({
-      ...book,
-      cover_image: book.cover_image ? `http://localhost:${PORT}/images/${book.cover_image}` : null,
-    }));
-
-    res.json(results);
-  });
-});
-
-// 📌 Return a book
-app.post("/return", (req, res) => {
-  const { user_id, book_id } = req.body;
-  const returnDate = new Date().toISOString().split("T")[0];
-
-  const query = `
-    UPDATE borrowing 
-    SET return_date = ? 
-    WHERE user_id = ? AND book_id = ? AND return_date IS NULL;
-  `;
-
-  db.query(query, [returnDate, user_id, book_id], (err, result) => {
-    if (err) {
-      console.error("❌ Error returning book:", err);
-      return res.status(500).json({ error: "Failed to return book" });
-    }
-    res.json({ message: "Book returned successfully!" });
-  });
-});
-
-// Start Server
+// 📌 Start Server
 app.listen(PORT, () => {
   console.log(`🚀 Server running on http://localhost:${PORT}`);
 });
