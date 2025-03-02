@@ -5,34 +5,26 @@ body {
     display: flex;
     justify-content: center;
     align-items: center;
-    height: 100vh;
+    min-height: 100vh; /* Ensure the full screen is covered */
     margin: 0;
+    flex-direction: column;
 }
 
-/* Container for Forms */
+/* Container for Books */
 .container {
     background: #fff;
-    padding: 30px;
+    padding: 20px;
     border-radius: 8px;
     box-shadow: 0px 4px 10px rgba(0, 0, 0, 0.1);
     text-align: center;
     width: 100%;
-    max-width: 350px;
+    max-width: 600px;
 }
 
-/* Form Styling */
+/* Page Title */
 h2 {
     color: #333;
     margin-bottom: 20px;
-}
-
-input {
-    width: 100%;
-    padding: 10px;
-    margin: 8px 0;
-    border: 1px solid #ddd;
-    border-radius: 5px;
-    font-size: 16px;
 }
 
 /* Button Styling */
@@ -46,78 +38,107 @@ button {
     font-size: 16px;
     cursor: pointer;
     margin-top: 10px;
+    transition: background 0.3s;
 }
 
 button:hover {
     background: #0056b3;
 }
 
-/* Links */
-p {
-    margin-top: 15px;
-    font-size: 14px;
-}
-
-p a {
-    color: #007bff;
-    text-decoration: none;
-    font-weight: bold;
-}
-
-p a:hover {
-    text-decoration: underline;
-}
-
+/* Book Grid */
 .book-grid {
     display: grid;
-    grid-template-columns: repeat(auto-fill, minmax(150px, 1fr));
-    gap: 20px;
+    grid-template-columns: repeat(auto-fill, minmax(120px, 1fr)); /* Auto-fits books */
+    gap: 15px;
     margin-top: 20px;
+    justify-content: center;
 }
 
+/* Individual Book */
 .book-item {
     background: white;
     padding: 10px;
-    border-radius: 5px;
+    border-radius: 8px;
     cursor: pointer;
-    box-shadow: 0px 0px 5px rgba(0, 0, 0, 0.1);
-    transition: transform 0.2s ease;
+    box-shadow: 0px 2px 5px rgba(0, 0, 0, 0.1);
+    transition: transform 0.2s ease, box-shadow 0.2s ease;
+    text-align: center;
 }
 
 .book-item:hover {
     transform: scale(1.05);
+    box-shadow: 0px 5px 15px rgba(0, 0, 0, 0.2);
 }
 
+/* Book Image */
 .book-item img {
-    width: 100px; /* Adjust as needed */
-    height: 150px; /* Ensure a fixed height */
+    width: 100px;
+    height: 150px;
     object-fit: cover; /* Prevent stretching */
     border-radius: 5px;
-    display: block; /* Ensure it shows */
+    display: block;
+    margin: 0 auto;
 }
 
-
+/* Book Title */
 .book-item h3 {
-    font-size: 16px;
+    font-size: 14px;
     margin: 5px 0;
+    font-weight: bold;
 }
-.modal img {
+
+/* Book Author */
+.book-item p {
+    font-size: 12px;
+    color: #555;
+    margin-bottom: 5px;
+}
+
+/* MODAL (Popup when clicking a book) */
+.modal {
+    display: none; /* Initially hidden */
+    position: fixed;
+    z-index: 1000; /* Ensures it appears on top */
+    left: 0;
+    top: 0;
     width: 100%;
-    height: auto;
-    border-radius: 5px;
+    height: 100%;
+    background-color: rgba(0, 0, 0, 0.7); /* Semi-transparent background */
+    display: flex;
+    justify-content: center;
+    align-items: center;
 }
 
-.close {
-    float: right;
-    font-size: 24px;
-    cursor: pointer;
-}
-
+/* Modal Content */
 .modal-content {
     background: white;
     padding: 20px;
-    margin: 10% auto;
-    width: 50%;
     border-radius: 8px;
-    text-align: left;
+    text-align: center;
+    max-width: 500px; /* Adjust size */
+    width: 90%;
+    box-shadow: 0px 4px 10px rgba(0, 0, 0, 0.2);
+    position: relative;
+}
+
+/* Close Button */
+.close {
+    position: absolute;
+    top: 10px;
+    right: 15px;
+    font-size: 24px;
+    cursor: pointer;
+    color: #888;
+}
+
+.close:hover {
+    color: black;
+}
+
+/* Book Image in Modal */
+.modal img {
+    max-width: 100%;
+    height: auto;
+    border-radius: 5px;
+    margin-bottom: 15px;
 }

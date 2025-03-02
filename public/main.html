@@ -27,14 +27,14 @@
     </div>
 
     <script>
-        // ✅ Ensure user is logged in
-        const token = localStorage.getItem("token");
-        if (!token) {
-            window.location.href = "/login.html"; // Redirect to login if no token
-        }
+       // ✅ Ensure user is logged in
+const token = localStorage.getItem("token");
+if (!token) {
+    window.location.href = "/login.html"; // Redirect to login if no token
+}
 
-        // ✅ Fetch books and display as grid
-        async function fetchBooks() {
+// ✅ Fetch books and display them as a grid
+async function fetchBooks() {
     const response = await fetch("/books", {
         headers: { "Authorization": `Bearer ${token}` }
     });
@@ -44,8 +44,6 @@
     bookList.innerHTML = ""; // Clear previous content
 
     books.forEach(book => {
-        console.log("Book Image URL:", book.image_url); // ✅ Debugging log
-
         const bookDiv = document.createElement("div");
         bookDiv.classList.add("book-item");
         bookDiv.innerHTML = `
@@ -58,31 +56,31 @@
     });
 }
 
-
 fetchBooks();
 
+// ✅ Open book details modal
+function openModal(book) {
+    document.getElementById("bookTitle").innerText = book.title;
+    document.getElementById("bookImage").src = book.image_url;
+    document.getElementById("bookAuthor").innerText = book.author;
+    document.getElementById("bookGenre").innerText = book.genre;
+    document.getElementById("bookPublished").innerText = book.published_date;
+    document.getElementById("bookDescription").innerText = book.description;
+    
+    document.getElementById("bookModal").style.display = "flex"; // Show modal
+}
 
-        // ✅ Open book details modal
-        function openModal(book) {
-            document.getElementById("bookTitle").innerText = book.title;
-            document.getElementById("bookImage").src = book.image_url;
-            document.getElementById("bookAuthor").innerText = book.author;
-            document.getElementById("bookGenre").innerText = book.genre;
-            document.getElementById("bookPublished").innerText = book.published_date;
-            document.getElementById("bookDescription").innerText = book.description;
-            document.getElementById("bookModal").style.display = "block";
-        }
+// ✅ Close modal
+document.querySelector(".close").addEventListener("click", () => {
+    document.getElementById("bookModal").style.display = "none";
+});
 
-        // ✅ Close modal
-        document.querySelector(".close").addEventListener("click", () => {
-            document.getElementById("bookModal").style.display = "none";
-        });
+// ✅ Logout functionality
+document.getElementById("logoutBtn").addEventListener("click", function() {
+    localStorage.removeItem("token"); // Remove token
+    window.location.href = "/login.html"; // Redirect to login
+});
 
-        // ✅ Logout functionality
-        document.getElementById("logoutBtn").addEventListener("click", function() {
-            localStorage.removeItem("token"); // Remove token
-            window.location.href = "/login.html"; // Redirect to login
-        });
     </script>
 </body>
 </html>
