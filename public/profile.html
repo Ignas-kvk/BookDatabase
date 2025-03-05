@@ -1,0 +1,113 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>My Profile</title>
+    <link rel="stylesheet" href="styles.css">
+</head>
+<body>
+    <div class="container">
+        <h2>👤 My Profile</h2>
+        <button id="backBtn">← Back</button>
+        
+        <h3>📚 Borrowed Books (Current & Past)</h3>
+        <div id="borrowedBooks"></div>
+
+        <h3>⭐ My Reviews</h3>
+        <div id="userReviews"></div>
+
+        <h3>🔑 Change Password</h3>
+        <form id="changePasswordForm">
+            <input type="password" id="oldPassword" placeholder="Current Password" required>
+            <input type="password" id="newPassword" placeholder="New Password" required>
+            <button type="submit">Change Password</button>
+        </form>
+    </div>
+
+    <script>
+        const token = localStorage.getItem("token");
+        if (!token) {
+            window.location.href = "/login.html";
+        }
+
+        document.getElementById("backBtn").addEventListener("click", () => {
+            window.location.href = "/main.html"; // ✅ Back to main page
+        });
+
+        async function fetchProfileData() {
+    const response = await fetch("/profile", {
+        headers: { "Authorization": `Bearer ${token}` }
+    });
+
+    const data = await response.json();
+    
+    console.log("Borrowed Books Data:", data.borrowedBooks); // ✅ Debugging log
+
+    document.getElementById("borrowedBooks").innerHTML = data.borrowedBooks.length
+        ? data.borrowedBooks.map(b => `
+            <p>
+                📖 ${b.title} (Borrowed: ${b.borrow_date} | Due: ${b.return_date || "Not returned"})
+                ${!b.return_date ? `<button onclick="returnBook(${b.book_id})">Return</button>` : ""}
+            </p>
+        `).join("")
+        : "<p>No borrowed books</p>";
+
+    document.getElementById("userReviews").innerHTML = data.reviews.length
+        ? data.reviews.map(r => `<p>⭐${r.rating} - ${r.comment} (Book: ${r.bookTitle})</p>`).join("")
+        : "<p>No reviews given</p>";
+}
+
+
+
+// ✅ Return a Book Function
+async function returnBook(bookId) {
+    console.log("Attempting to return book with ID:", bookId); // ✅ Debugging log
+
+    if (!bookId) {
+        alert("Invalid book ID");
+        return;
+    }
+
+    const response = await fetch("/return", {
+        method: "POST",
+        headers: {
+            "Authorization": `Bearer ${token}`,
+            "Content-Type": "application/json"
+        },
+        body: JSON.stringify({ bookId: bookId }) // Ensure correct JSON format
+    });
+
+    const data = await response.json();
+    console.log("Return response:", data); // ✅ Debugging response from backend
+    alert(data.message || data.error);
+
+    if (data.message) {
+        fetchProfileData(); // Refresh borrowed books list
+    }
+}
+
+
+
+        document.getElementById("changePasswordForm").addEventListener("submit", async function (event) {
+            event.preventDefault();
+            const oldPassword = document.getElementById("oldPassword").value;
+            const newPassword = document.getElementById("newPassword").value;
+
+            const response = await fetch("/change-password", {
+                method: "POST",
+                headers: {
+                    "Content-Type": "application/json",
+                    "Authorization": `Bearer ${token}`
+                },
+                body: JSON.stringify({ oldPassword, newPassword })
+            });
+
+            const result = await response.json();
+            alert(result.message || result.error);
+        });
+
+        fetchProfileData();
+    </script>
+</body>
+</html>

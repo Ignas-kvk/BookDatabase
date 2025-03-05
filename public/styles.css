@@ -5,7 +5,7 @@ body {
     display: flex;
     justify-content: center;
     align-items: center;
-    min-height: 100vh; /* Ensure the full screen is covered */
+    min-height: 100vh;
     margin: 0;
     flex-direction: column;
 }
@@ -17,8 +17,8 @@ body {
     border-radius: 8px;
     box-shadow: 0px 4px 10px rgba(0, 0, 0, 0.1);
     text-align: center;
-    width: 100%;
-    max-width: 600px;
+    width: 90%;
+    max-width: 900px; /* Increased width */
 }
 
 /* Page Title */
@@ -48,21 +48,26 @@ button:hover {
 /* Book Grid */
 .book-grid {
     display: grid;
-    grid-template-columns: repeat(auto-fill, minmax(120px, 1fr)); /* Auto-fits books */
-    gap: 15px;
+    grid-template-columns: repeat(auto-fill, minmax(180px, 1fr)); /* Bigger books */
+    gap: 20px;
     margin-top: 20px;
     justify-content: center;
 }
 
-/* Individual Book */
+/* ✅ Ensure the entire book item is clickable */
 .book-item {
     background: white;
-    padding: 10px;
+    padding: 15px;
     border-radius: 8px;
     cursor: pointer;
     box-shadow: 0px 2px 5px rgba(0, 0, 0, 0.1);
     transition: transform 0.2s ease, box-shadow 0.2s ease;
     text-align: center;
+    display: flex;          /* ✅ Ensures clickability */
+    flex-direction: column; /* ✅ Keeps title & author stacked */
+    align-items: center;
+    justify-content: space-between;
+    height: 100%;
 }
 
 .book-item:hover {
@@ -70,10 +75,18 @@ button:hover {
     box-shadow: 0px 5px 15px rgba(0, 0, 0, 0.2);
 }
 
+/* ✅ Make sure book-item content is clickable */
+.book-item img, 
+.book-item h3, 
+.book-item p {
+    pointer-events: none; /* ✅ Prevents click interference */
+}
+
+
 /* Book Image */
 .book-item img {
-    width: 100px;
-    height: 150px;
+    width: 150px; /* Increased size */
+    height: 220px; /* Keep proportions */
     object-fit: cover; /* Prevent stretching */
     border-radius: 5px;
     display: block;
@@ -82,14 +95,14 @@ button:hover {
 
 /* Book Title */
 .book-item h3 {
-    font-size: 14px;
-    margin: 5px 0;
+    font-size: 16px; /* Bigger text */
+    margin: 10px 0;
     font-weight: bold;
 }
 
 /* Book Author */
 .book-item p {
-    font-size: 12px;
+    font-size: 14px;
     color: #555;
     margin-bottom: 5px;
 }
@@ -112,8 +125,8 @@ button:hover {
 /* Modal Content */
 .modal-content {
     background: white;
-    padding: 20px;
-    border-radius: 8px;
+    padding: 25px;
+    border-radius: 10px;
     text-align: center;
     max-width: 500px; /* Adjust size */
     width: 90%;
@@ -126,7 +139,7 @@ button:hover {
     position: absolute;
     top: 10px;
     right: 15px;
-    font-size: 24px;
+    font-size: 28px;
     cursor: pointer;
     color: #888;
 }
@@ -141,4 +154,101 @@ button:hover {
     height: auto;
     border-radius: 5px;
     margin-bottom: 15px;
+}
+.logout-container {
+    display: flex;
+    justify-content: center; 
+    margin-top: 30px;
+}
+
+#logoutBtn {
+    background-color: #d9534f; /* 🔴 Red Color */
+    color: white;
+    font-size: 16px;
+    padding: 10px 20px;
+    border: none;
+    border-radius: 5px;
+    cursor: pointer;
+    transition: 0.3s;
+}
+
+#logoutBtn:hover {
+    background-color: #c9302c; /* Darker Red on Hover */
+}
+/* ✅ Filter Section */
+.filter-container {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    background: #fff;
+    padding: 15px;
+    border-radius: 10px;
+    box-shadow: 0px 3px 10px rgba(0, 0, 0, 0.1);
+    width: 90%;
+    max-width: 800px;
+    margin: 20px auto;
+}
+
+/* ✅ Input Fields Styling */
+.filter-inputs {
+    display: flex;
+    flex-wrap: wrap;
+    justify-content: space-between;
+    width: 100%;
+}
+
+.input-group {
+    flex: 1;
+    margin: 5px;
+}
+
+.input-group input, .input-group select {
+    width: 100%;
+    padding: 10px;
+    border-radius: 5px;
+    border: 1px solid #ccc;
+    font-size: 14px;
+    outline: none;
+    transition: 0.2s ease-in-out;
+}
+
+/* ✅ Add Hover & Focus Effects */
+.input-group input:focus, .input-group select:focus {
+    border-color: #007bff;
+    box-shadow: 0px 0px 5px rgba(0, 123, 255, 0.5);
+}
+
+/* ✅ Search Button */
+#filterBtn {
+    background: #007bff;
+    color: white;
+    font-size: 16px;
+    padding: 10px 15px;
+    border: none;
+    border-radius: 5px;
+    cursor: pointer;
+    margin-top: 10px;
+    transition: background 0.3s ease-in-out;
+}
+
+#filterBtn:hover {
+    background: #0056b3;
+}
+
+/* ✅ Responsive Adjustments */
+@media (max-width: 600px) {
+    .filter-inputs {
+        flex-direction: column;
+        width: 100%;
+    }
+}
+
+/* ✅ Prevent overlapping elements from blocking clicks */
+.book-grid {
+    position: relative;
+    z-index: 2;
+}
+.filter-container {
+    position: relative;
+    z-index: 1;
 }

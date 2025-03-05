@@ -8,79 +8,249 @@
 </head>
 <body>
     <div class="container">
-        <h2>📚 Browse Books</h2>
-        <button id="logoutBtn">Logout</button>
-        <div id="bookList" class="book-grid"></div>
+    <h2>📚 Browse Books</h2>
+    <div class="top-right-buttons">
+        <button id="profileBtn">Profile</button>
     </div>
 
-    <!-- Book Details Modal -->
-    <div id="bookModal" class="modal">
-        <div class="modal-content">
-            <span class="close">&times;</span>
-            <h2 id="bookTitle"></h2>
-            <img id="bookImage" src="" alt="Book Cover">
-            <p><strong>Author:</strong> <span id="bookAuthor"></span></p>
-            <p><strong>Genre:</strong> <span id="bookGenre"></span></p>
-            <p><strong>Published:</strong> <span id="bookPublished"></span></p>
-            <p><strong>Description:</strong> <span id="bookDescription"></span></p>
+    <!-- ✅ Improved Filter Section -->
+<div class="filter-container">
+    <div class="filter-inputs">
+        <div class="input-group">
+            <input type="text" id="searchTitle" placeholder="🔍 Search by title...">
+        </div>
+        <div class="input-group">
+            <input type="text" id="searchAuthor" placeholder="✍ Search by author...">
+        </div>
+        <div class="input-group">
+            <select id="searchGenre">
+                <option value="">📚 All Genres</option>
+            </select>
+        </div>
+        <div class="input-group">
+            <input type="text" id="searchPublisher" placeholder="🏢 Search by publisher...">
         </div>
     </div>
+    <button id="filterBtn">🔎 Apply Filters</button>
+</div>
+
+
+    <div id="bookList" class="book-grid"></div>
+</div>
+
+<!-- ✅ Logout Button (Moved to Bottom) -->
+<div class="logout-container">
+    <button id="logoutBtn">Logout</button>
+</div>
+
+    
+
+    <!-- Book Details Modal -->
+<div id="bookModal" class="modal" style="display: none;">
+    <div class="modal-content">
+        <span class="close">&times;</span>
+        <h2 id="bookTitle"></h2>
+        <img id="bookImage" src="" alt="Book Cover">
+        <p><strong>Author:</strong> <span id="bookAuthor"></span></p>
+        <p><strong>Genre:</strong> <span id="bookGenre"></span></p>
+        <p><strong>Published:</strong> <span id="bookPublished"></span></p>
+        <p><span id="bookPublisher"></span></p> <!-- ✅ Added Publisher -->
+        <p><strong>Description:</strong> <span id="bookDescription"></span></p>
+        <h3>Reviews</h3>
+        <div id="reviewsSection">Loading reviews...</div>
+        <button id="borrowBtn">📖 Borrow This Book</button> 
+    </div>
+</div>
+
+
 
     <script>
-       // ✅ Ensure user is logged in
-const token = localStorage.getItem("token");
-if (!token) {
-    window.location.href = "/login.html"; // Redirect to login if no token
+        // ✅ Ensure user is logged in
+        const token = localStorage.getItem("token");
+        if (!token) {
+            window.location.href = "/login.html"; // Redirect to login if no token
+        }
+        document.getElementById("profileBtn").addEventListener("click", function () {
+            window.location.href = "/profile.html"; // ✅ Navigate to profile page
+        });
+
+        document.getElementById("logoutBtn").addEventListener("click", function () {
+            localStorage.removeItem("token");
+            window.location.href = "/login.html"; 
+        });
+
+       // ✅ Fetch books and filter them dynamically
+async function fetchBooks() {
+    try {
+        const response = await fetch("/books", {
+            headers: { "Authorization": `Bearer ${token}` }
+        });
+
+        if (!response.ok) throw new Error("Failed to fetch books");
+
+        const books = await response.json();
+        displayBooks(books); // Call function to display books
+
+        // ✅ Populate genre dropdown dynamically
+        const genreDropdown = document.getElementById("searchGenre");
+        const genres = [...new Set(books.map(book => book.genre))]; // Get unique genres
+        genres.forEach(genre => {
+            const option = document.createElement("option");
+            option.value = genre;
+            option.textContent = genre;
+            genreDropdown.appendChild(option);
+        });
+
+    } catch (error) {
+        console.error("❌ Error fetching books:", error);
+    }
 }
 
-// ✅ Fetch books and display them as a grid
-async function fetchBooks() {
-    const response = await fetch("/books", {
-        headers: { "Authorization": `Bearer ${token}` }
-    });
-    const books = await response.json();
-
+// ✅ Display books based on filter
+function displayBooks(books) {
     const bookList = document.getElementById("bookList");
     bookList.innerHTML = ""; // Clear previous content
 
     books.forEach(book => {
         const bookDiv = document.createElement("div");
         bookDiv.classList.add("book-item");
+
+        // ✅ Ensure the entire div is clickable
+        bookDiv.onclick = () => openModal(book);
+
         bookDiv.innerHTML = `
             <img src="${book.image_url}" alt="${book.title}" onerror="this.src='default.jpg'">
             <h3>${book.title}</h3>
             <p>${book.author}</p>
         `;
-        bookDiv.addEventListener("click", () => openModal(book));
+
         bookList.appendChild(bookDiv);
     });
 }
+// ✅ Fetch Reviews for a Book
+async function fetchReviews(bookId) {
+    try {
+        const response = await fetch(`/reviews/${bookId}`);
+        if (!response.ok) throw new Error("Failed to fetch reviews");
 
+        return await response.json();
+    } catch (error) {
+        console.error("❌ Error fetching reviews:", error);
+        return []; // Return empty array in case of error
+    }
+}
+
+
+// ✅ Apply filtering logic
+document.getElementById("filterBtn").addEventListener("click", async () => {
+    try {
+        const response = await fetch("/books", {
+            headers: { "Authorization": `Bearer ${token}` }
+        });
+
+        if (!response.ok) throw new Error("Failed to fetch books");
+
+        let books = await response.json();
+
+        const title = document.getElementById("searchTitle").value.toLowerCase();
+        const author = document.getElementById("searchAuthor").value.toLowerCase();
+        const genre = document.getElementById("searchGenre").value;
+        const publisher = document.getElementById("searchPublisher").value.toLowerCase();
+
+        // ✅ Apply filters
+        books = books.filter(book =>
+            (title === "" || book.title.toLowerCase().includes(title)) &&
+            (author === "" || book.author.toLowerCase().includes(author)) &&
+            (genre === "" || book.genre === genre) &&
+            (publisher === "" || book.publisher.toLowerCase().includes(publisher))
+        );
+
+        displayBooks(books); // Display filtered books
+    } catch (error) {
+        console.error("❌ Error filtering books:", error);
+    }
+});
+
+// ✅ Initial fetch when page loads
 fetchBooks();
 
-// ✅ Open book details modal
-function openModal(book) {
+
+        // ✅ Open book details modal
+        async function openModal(book) {
     document.getElementById("bookTitle").innerText = book.title;
     document.getElementById("bookImage").src = book.image_url;
-    document.getElementById("bookAuthor").innerText = book.author;
+    document.getElementById("bookAuthor").innerText = book.author || "Unknown Author";
     document.getElementById("bookGenre").innerText = book.genre;
     document.getElementById("bookPublished").innerText = book.published_date;
     document.getElementById("bookDescription").innerText = book.description;
-    
-    document.getElementById("bookModal").style.display = "flex"; // Show modal
+
+    // ✅ Add Publisher to Modal
+    let publisherInfo = document.getElementById("bookPublisher");
+    if (!publisherInfo) {
+        publisherInfo = document.createElement("p");
+        publisherInfo.id = "bookPublisher";
+        document.querySelector(".modal-content").insertBefore(publisherInfo, document.getElementById("reviewsSection"));
+    }
+    publisherInfo.innerHTML = `<strong>Publisher:</strong> ${book.publisher || "Unknown Publisher"}`;
+
+    const reviews = await fetchReviews(book.id);
+    let reviewHtml = "";
+    reviews.forEach(review => {
+        reviewHtml += `<p><strong>${review.user_name}:</strong> ⭐${review.rating} - ${review.comment}</p>`;
+    });
+
+    document.getElementById("reviewsSection").innerHTML = reviewHtml || "<p>No reviews yet.</p>";
+
+    // ✅ Enable Borrow Button
+    const borrowBtn = document.getElementById("borrowBtn");
+    if (book.copies && book.copies > 0) {
+        borrowBtn.style.display = "block";
+        borrowBtn.innerText = `📖 Borrow This Book (${book.copies} left)`;
+    } else {
+        borrowBtn.style.display = "none";
+        borrowBtn.innerText = "🚫 No Copies Available";
+    }
+
+    borrowBtn.onclick = () => borrowBook(book.id);
+
+    document.getElementById("bookModal").style.display = "flex";
 }
 
-// ✅ Close modal
-document.querySelector(".close").addEventListener("click", () => {
-    document.getElementById("bookModal").style.display = "none";
-});
 
-// ✅ Logout functionality
-document.getElementById("logoutBtn").addEventListener("click", function() {
-    localStorage.removeItem("token"); // Remove token
-    window.location.href = "/login.html"; // Redirect to login
-});
+// ✅ Borrow a Book
+async function borrowBook(bookId) {
+    const response = await fetch("/borrow", {
+        method: "POST",
+        headers: {
+            "Authorization": `Bearer ${token}`,
+            "Content-Type": "application/json"
+        },
+        body: JSON.stringify({ bookId })
+    });
 
+    const data = await response.json();
+    
+    if (data.error) {
+        alert(`❌ ${data.error}`);  // Show error if user already has the book
+    } else {
+        alert(`✅ ${data.message}`);
+        document.getElementById("bookModal").style.display = "none"; // Close modal
+        fetchBooks(); // Refresh book list
+    }
+}
+
+
+
+        // ✅ Close modal safely
+        document.querySelector(".close").addEventListener("click", () => {
+            document.getElementById("bookModal").style.display = "none";
+        });
+
+        // ✅ Logout functionality
+        document.getElementById("logoutBtn").addEventListener("click", function() {
+            localStorage.removeItem("token"); // Remove token
+            window.location.href = "/login.html"; // Redirect to login
+        });
     </script>
 </body>
 </html>
