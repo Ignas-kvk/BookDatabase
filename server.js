@@ -98,7 +98,19 @@ app.post("/signup", async (req, res) => {
     }
   });
 });
+// ✅ Middleware to get logged-in user ID from token
+const authenticateUser = (req, res, next) => {
+  const token = req.headers.authorization?.split(" ")[1];
+  if (!token) return res.status(401).json({ error: "Unauthorized" });
 
+  try {
+      const decoded = jwt.verify(token, "your_secret_key");
+      req.userId = decoded.id;
+      next();
+  } catch {
+      res.status(401).json({ error: "Invalid token" });
+  }
+};
 // ✅ Login (Authenticate User)
 app.post("/login", (req, res) => {
   const { email, password } = req.body;
@@ -123,42 +135,86 @@ app.post("/login", (req, res) => {
   });
 });
 
-// 📌 Fetch Books with OOP Approach
 app.get("/books", (req, res) => {
-  const query = `
+  const { sortBy = "title", order = "asc", title, author, genre, publisher } = req.query;
+  const sortOrder = order === "desc" ? "DESC" : "ASC";
+
+  let query = `
       SELECT book.id, book.title, 
-       DATE_FORMAT(book.published_date, '%Y-%m-%d') AS published_date, 
-       book.copies, book.image_url, book.description, 
-       genre.name AS genre, 
-       author.id AS author_id, author.name AS author_name, author.bio AS author_bio,
-       publisher.id AS publisher_id, publisher.name AS publisher_name, publisher.location AS publisher_location
-FROM book
-JOIN genre ON book.genre = genre.id
-JOIN author ON book.author_id = author.id
-LEFT JOIN publisher ON book.publisher_id = publisher.id
-LIMIT 20;
+             DATE_FORMAT(book.published_date, '%Y-%m-%d') AS published_date, 
+             book.copies, book.image_url, book.description, 
+             genre.name AS genre, 
+             author.name AS author_name,
+             publisher.name AS publisher_name,
+             IFNULL(AVG(review.rating), 0) AS avg_rating, COUNT(review.id) AS review_count
+      FROM book
+      JOIN genre ON book.genre = genre.id
+      JOIN author ON book.author_id = author.id
+      LEFT JOIN publisher ON book.publisher_id = publisher.id
+      LEFT JOIN review ON book.id = review.book_id
   `;
 
-  db.query(query, (err, results) => {
-    if (err) return res.status(500).json({ error: "Database error" });
+  let conditions = [];
+  let params = [];
 
-    const books = results.map(row => {
-      return {
-        id: row.id,
-        title: row.title,
-        author: row.author_name,
-        genre: row.genre,
-        published_date: row.published_date,
-        copies: row.copies,
-        image_url: `http://localhost:3000/images/${path.basename(row.image_url)}`,
-        description: row.description,
-        publisher: row.publisher_name || "Unknown Publisher"  // ✅ Ensure a valid publisher name
-      };
-    });
+  if (title) {
+      conditions.push("book.title LIKE ?");
+      params.push(`%${title}%`);
+  }
+  if (author) {
+      conditions.push("author.name LIKE ?");
+      params.push(`%${author}%`);
+  }
+  if (genre) {
+      conditions.push("genre.name = ?");
+      params.push(genre);
+  }
+  if (publisher) {
+      conditions.push("publisher.name LIKE ?");
+      params.push(`%${publisher}%`);
+  }
 
-    res.json(books);
+  if (conditions.length > 0) {
+      query += " WHERE " + conditions.join(" AND ");
+  }
+
+  query += `
+      GROUP BY book.id, book.title, book.published_date, book.copies, book.image_url, 
+               book.description, genre.name, author.name, publisher.name
+      ORDER BY ${sortBy} ${sortOrder};
+  `;
+
+  db.query(query, params, (err, results) => {
+      if (err) return res.status(500).json({ error: "Database error" });
+
+      const books = results.map(row => ({
+          id: row.id,
+          title: row.title,
+          author: row.author_name,
+          genre: row.genre,
+          published_date: row.published_date,
+          copies: row.copies,
+          image_url: `http://localhost:3000/images/${path.basename(row.image_url)}`,
+          description: row.description,
+          publisher: row.publisher_name || "Unknown Publisher",
+          avg_rating: parseFloat(row.avg_rating).toFixed(1),
+          review_count: row.review_count
+      }));
+
+      res.json(books);
   });
 });
+app.get("/genres", (req, res) => {
+  const query = "SELECT DISTINCT name FROM genre ORDER BY name ASC";
+
+  db.query(query, (err, results) => {
+      if (err) return res.status(500).json({ error: "Database error" });
+
+      const genres = results.map(row => row.name);
+      res.json(genres);
+  });
+});
+
 
 
 
@@ -169,6 +225,77 @@ app.get("/authors", (req, res) => {
     res.json(results.map(row => new Author(row.id, row.name, row.bio)));
   });
 });
+// ✅ Check if the user can rate a book (only if they have borrowed or are reading it)
+app.get("/can-rate/:bookId", authenticateUser, (req, res) => {
+  const userId = req.userId;
+  const { bookId } = req.params;
+
+  const checkOwnershipQuery = `
+      SELECT * FROM borrowing 
+      WHERE user_id = ? AND book_id = ? 
+      AND (return_date IS NULL OR borrow_date IS NOT NULL);
+  `;
+
+  const checkReviewQuery = `SELECT * FROM review WHERE user_id = ? AND book_id = ?;`;
+
+  db.query(checkOwnershipQuery, [userId, bookId], (err, borrowedResults) => {
+    if (err) {
+      console.error("❌ Database error checking ownership:", err);
+      return res.status(500).json({ error: "Database error" });
+    }
+
+    if (borrowedResults.length === 0) {
+      return res.json({ canRate: false, hasRated: false }); // ❌ User never borrowed
+    }
+
+    db.query(checkReviewQuery, [userId, bookId], (err, reviewResults) => {
+      if (err) {
+        console.error("❌ Database error checking review:", err);
+        return res.status(500).json({ error: "Database error" });
+      }
+
+      const hasRated = reviewResults.length > 0; // ✅ Check if user already rated
+      res.json({ canRate: !hasRated, hasRated });
+    });
+  });
+});
+
+app.post("/review", authenticateUser, (req, res) => {
+  const userId = req.userId;
+  const { bookId, rating, comment } = req.body;
+
+  console.log("Received review data:", { userId, bookId, rating, comment });
+
+  if (!bookId || !rating || rating < 1 || rating > 5 || !comment.trim()) {
+      console.log("❌ Invalid review data. Rejecting request.");
+      return res.status(400).json({ error: "Invalid review data. Make sure all fields are filled correctly." });
+  }
+
+  // Check if the user already reviewed this book
+  const checkReviewQuery = `SELECT * FROM review WHERE user_id = ? AND book_id = ?`;
+
+  db.query(checkReviewQuery, [userId, bookId], (err, results) => {
+      if (err) return res.status(500).json({ error: "Database error" });
+
+      if (results.length > 0) {
+          // ✅ Update existing review
+          const updateReviewQuery = `UPDATE review SET rating = ?, comment = ? WHERE user_id = ? AND book_id = ?`;
+          db.query(updateReviewQuery, [rating, comment, userId, bookId], (err) => {
+              if (err) return res.status(500).json({ error: "Database error" });
+              res.json({ message: "Review updated successfully!" });
+          });
+      } else {
+          // ✅ Insert new review if not exists
+          const insertReviewQuery = `INSERT INTO review (user_id, book_id, rating, comment) VALUES (?, ?, ?, ?)`;
+          db.query(insertReviewQuery, [userId, bookId, rating, comment], (err) => {
+              if (err) return res.status(500).json({ error: "Database error" });
+              res.json({ message: "Review submitted successfully!" });
+          });
+      }
+  });
+});
+
+
 
 // 📌 Fetch Reviews for a Book
 app.get("/reviews/:bookId", async (req, res) => {
@@ -201,20 +328,6 @@ app.post("/reviews", (req, res) => {
     }
   );
 });
-
-// ✅ Middleware to get logged-in user ID from token
-const authenticateUser = (req, res, next) => {
-  const token = req.headers.authorization?.split(" ")[1];
-  if (!token) return res.status(401).json({ error: "Unauthorized" });
-
-  try {
-      const decoded = jwt.verify(token, "your_secret_key");
-      req.userId = decoded.id;
-      next();
-  } catch {
-      res.status(401).json({ error: "Invalid token" });
-  }
-};
 
 
 // ✅ Borrow a Book

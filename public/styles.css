@@ -107,34 +107,37 @@ button:hover {
     margin-bottom: 5px;
 }
 
-/* MODAL (Popup when clicking a book) */
+/* ✅ MODAL: Prevent Clipping & Make it Responsive */
 .modal {
     display: none; /* Initially hidden */
     position: fixed;
-    z-index: 1000; /* Ensures it appears on top */
+    z-index: 1000;
     left: 0;
     top: 0;
     width: 100%;
     height: 100%;
-    background-color: rgba(0, 0, 0, 0.7); /* Semi-transparent background */
+    background-color: rgba(0, 0, 0, 0.7); /* Dark overlay */
     display: flex;
     justify-content: center;
     align-items: center;
+    padding: 20px; /* Prevents clipping */
+    overflow-y: auto; /* Allows scrolling */
 }
 
-/* Modal Content */
+/* ✅ Modal Content: Scrollable if needed */
 .modal-content {
     background: white;
     padding: 25px;
     border-radius: 10px;
     text-align: center;
-    max-width: 500px; /* Adjust size */
-    width: 90%;
+    width: 90%; /* Adjusts for small screens */
+    max-width: 500px;
+    max-height: 90vh; /* Prevents clipping */
+    overflow-y: auto; /* Allows scrolling */
     box-shadow: 0px 4px 10px rgba(0, 0, 0, 0.2);
     position: relative;
 }
-
-/* Close Button */
+/* ✅ Close Button */
 .close {
     position: absolute;
     top: 10px;
@@ -148,10 +151,10 @@ button:hover {
     color: black;
 }
 
-/* Book Image in Modal */
+/* ✅ Ensure Book Image inside Modal scales properly */
 .modal img {
     max-width: 100%;
-    height: auto;
+    max-height: 300px; /* Ensures it doesn’t exceed screen */
     border-radius: 5px;
     margin-bottom: 15px;
 }
@@ -235,11 +238,11 @@ button:hover {
     background: #0056b3;
 }
 
-/* ✅ Responsive Adjustments */
+/* ✅ Responsive Fixes */
 @media (max-width: 600px) {
-    .filter-inputs {
-        flex-direction: column;
-        width: 100%;
+    .modal-content {
+        width: 95%; /* More space on small screens */
+        max-height: 80vh;
     }
 }
 
