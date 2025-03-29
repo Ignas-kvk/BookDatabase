@@ -1,0 +1,420 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Book Browser</title>
+    <link rel="stylesheet" href="styles.css">
+</head>
+<body>
+    <div class="container">
+        <h2>📚 Browse Books</h2>
+        <div class="top-right-buttons">
+            <button id="profileBtn">Profile</button>
+        </div>
+
+        <!-- ✅ Improved Filter Section -->
+        <div class="filter-container">
+            <div class="filter-inputs">
+                <div class="input-group">
+                    <input type="text" id="searchTitle" placeholder="🔍 Search by title...">
+                </div>
+                <div class="input-group">
+                    <input type="text" id="searchAuthor" placeholder="✍ Search by author...">
+                </div>
+                <div class="input-group">
+                    <select id="searchGenre">
+                        <option value="">📚 All Genres</option>
+                    </select>
+                </div>
+                <div class="input-group">
+                    <input type="text" id="searchPublisher" placeholder="🏢 Search by publisher...">
+                </div>
+                <div class="input-group">
+                    <select id="sortBy">
+                        <option value="">🔀 Sort By</option>
+                        <option value="avg_rating">⭐ Average Rating (Low to High)</option>
+                        <option value="avg_rating_desc">⭐ Average Rating (High to Low)</option>
+                        <option value="title">📖 Title (A-Z)</option>
+                        <option value="title_desc">📖 Title (Z-A)</option>
+                    </select>
+                </div>
+                
+            </div>
+            <button id="filterBtn">🔎 Apply Filters</button>
+        </div>
+
+        <div id="bookList" class="book-grid"></div>
+        <p id="errorMessage" style="color: red; display: none;">❌ Error loading books.</p>
+    </div>
+
+    <!-- ✅ Logout Button -->
+    <div class="logout-container">
+        <button id="logoutBtn">Logout</button>
+    </div>
+
+    <!-- ✅ Book Details Modal -->
+    <div id="bookModal" class="modal" style="display: none;">
+        <div class="modal-content">
+            <span class="close">&times;</span>
+            <h2 id="bookTitle"></h2>
+            <img id="bookImage" src="" alt="Book Cover">
+            <p><strong>Author:</strong> <span id="bookAuthor"></span></p>
+            <p><strong>Genre:</strong> <span id="bookGenre"></span></p>
+            <p><strong>Published:</strong> <span id="bookPublished"></span></p>
+            <p><strong>Publisher:</strong> <span id="bookPublisher"></span></p>
+            <p><strong>Description:</strong> <span id="bookDescription"></span></p>
+
+            <!-- ✅ Rating and Review -->
+            <h3>Rate this Book</h3>
+            <div id="ratingForm" style="display: none;">
+                <select id="ratingSelect">
+                    <option value="5">⭐⭐⭐⭐⭐ - Excellent</option>
+                    <option value="4">⭐⭐⭐⭐ - Good</option>
+                    <option value="3">⭐⭐⭐ - Average</option>
+                    <option value="2">⭐⭐ - Poor</option>
+                    <option value="1">⭐ - Bad</option>
+                </select>
+                <textarea id="ratingComment" placeholder="Leave a comment..."></textarea>
+                <button id="submitReviewBtn">Submit Review</button>
+            </div>
+
+            <!-- ✅ Reviews Section -->
+            <h3>Reviews</h3>
+            <div id="reviewsSection">Loading reviews...</div>
+
+            <button id="borrowBtn">📖 Borrow This Book</button>
+        </div>
+    </div>
+
+
+
+    <script>
+        let currentBook = null; // Store the currently opened book
+
+        // ✅ Ensure user is logged in
+        const token = localStorage.getItem("token");
+        if (!token) {
+            window.location.href = "/login.html"; // Redirect to login if no token
+        }
+        document.getElementById("profileBtn").addEventListener("click", function () {
+            window.location.href = "/profile.html"; // ✅ Navigate to profile page
+        });
+
+        document.getElementById("logoutBtn").addEventListener("click", function () {
+            localStorage.removeItem("token");
+            window.location.href = "/login.html"; 
+        });
+
+        // ✅ Observer Pattern Implementation
+        class BookListObserver {
+            constructor() {
+                this.subscribers = [];
+            }
+
+            subscribe(callback) {
+                this.subscribers.push(callback);
+            }
+
+            notify(data) {
+                this.subscribers.forEach(callback => callback(data));
+            }
+        }
+
+        const bookListObserver = new BookListObserver();
+
+        // Subscribe to book list updates
+        bookListObserver.subscribe(displayBooks);
+
+       // ✅ Fetch books and notify observers
+       async function fetchBooks() {
+    try {
+        const title = document.getElementById("searchTitle").value.toLowerCase();
+        const author = document.getElementById("searchAuthor").value.toLowerCase();
+        const genre = document.getElementById("searchGenre").value;
+        const publisher = document.getElementById("searchPublisher").value.toLowerCase();
+        
+        const sortBySelect = document.getElementById("sortBy").value;
+        let sortBy = "title";
+        let order = "asc";
+
+        if (sortBySelect === "avg_rating") {
+            sortBy = "avg_rating";
+            order = "asc";
+        } else if (sortBySelect === "avg_rating_desc") {
+            sortBy = "avg_rating";
+            order = "desc";
+        } else if (sortBySelect === "title") {
+            sortBy = "title";
+            order = "asc";
+        } else if (sortBySelect === "title_desc") {
+            sortBy = "title";
+            order = "desc";
+        }
+
+        const queryParams = new URLSearchParams({
+            sortBy,
+            order,
+            title: title || "",
+            author: author || "",
+            genre: genre || "",
+            publisher: publisher || ""
+        });
+
+        const response = await fetch(`/books?${queryParams.toString()}`, {
+            headers: { "Authorization": `Bearer ${token}` }
+        });
+
+        if (!response.ok) throw new Error("Failed to fetch books");
+
+        const books = await response.json();
+        bookListObserver.notify(books); // Notify all subscribers
+
+    } catch (error) {
+        console.error("❌ Error fetching books:", error);
+    }
+}
+
+
+
+// ✅ Display books based on filter
+function displayBooks(books) {
+    const bookList = document.getElementById("bookList");
+    bookList.innerHTML = ""; 
+
+    books.forEach(book => {
+        const bookDiv = document.createElement("div");
+        bookDiv.classList.add("book-item");
+
+        bookDiv.onclick = () => openModal(book);
+
+        bookDiv.innerHTML = `
+            <img src="${book.imageUrl}" alt="${book.title}" onerror="this.src='/images/default.jpg'">
+            <h3>${book.title}</h3>
+            <p>${book.author}</p>
+            <p>⭐ ${book.averageRating || "N/A"} (${book.reviewCount || 0} reviews)</p> 
+        `;
+
+        bookList.appendChild(bookDiv);
+    });
+}
+async function fetchGenres() {
+    try {
+        const response = await fetch("/genres");
+        if (!response.ok) throw new Error("Failed to fetch genres");
+
+        const genres = await response.json();
+        const genreDropdown = document.getElementById("searchGenre");
+
+        genreDropdown.innerHTML = `<option value="">📚 All Genres</option>`; // Reset options
+
+        genres.forEach(genre => {
+            const option = document.createElement("option");
+            option.value = genre;
+            option.textContent = genre;
+            genreDropdown.appendChild(option);
+        });
+
+    } catch (error) {
+        console.error("❌ Error fetching genres:", error);
+    }
+}
+document.addEventListener("DOMContentLoaded", () => {
+    fetchGenres();
+    fetchBooks();
+});
+
+
+// ✅ Fetch Reviews for a Book
+async function fetchReviews(bookId) {
+    try {
+        const response = await fetch(`/reviews/${bookId}`);
+        if (!response.ok) throw new Error("Failed to fetch reviews");
+
+        return await response.json();
+    } catch (error) {
+        console.error("❌ Error fetching reviews:", error);
+        return []; // Return empty array in case of error
+    }
+}
+
+
+// ✅ Apply filtering logic
+document.getElementById("filterBtn").addEventListener("click", async () => {
+    try {
+        const response = await fetch("/books", {
+            headers: { "Authorization": `Bearer ${token}` }
+        });
+
+        if (!response.ok) throw new Error("Failed to fetch books");
+
+        let books = await response.json();
+
+        const title = document.getElementById("searchTitle").value.toLowerCase();
+        const author = document.getElementById("searchAuthor").value.toLowerCase();
+        const genre = document.getElementById("searchGenre").value;
+        const publisher = document.getElementById("searchPublisher").value.toLowerCase();
+
+        // ✅ Apply filters
+        books = books.filter(book =>
+            (title === "" || book.title.toLowerCase().includes(title)) &&
+            (author === "" || book.author.toLowerCase().includes(author)) &&
+            (genre === "" || book.genre === genre) &&
+            (publisher === "" || book.publisher.toLowerCase().includes(publisher))
+        );
+
+        displayBooks(books); // Display filtered books
+    } catch (error) {
+        console.error("❌ Error filtering books:", error);
+    }
+});
+
+
+
+
+        // ✅ Open book details modal
+        async function openModal(book) {
+            currentBook = book; // Store the currently opened book
+    document.getElementById("bookTitle").innerText = book.title;
+    document.getElementById("bookImage").src = book.imageUrl; // Use correct field
+    document.getElementById("bookAuthor").innerText = book.author || "Unknown Author";
+    document.getElementById("bookGenre").innerText = book.genre;
+    document.getElementById("bookPublished").innerText = book.publishedDate || "Unknown"; // Use correct field
+    document.getElementById("bookDescription").innerText = book.description;
+    document.getElementById("bookPublisher").innerText = book.publisher || "Unknown Publisher";
+// ✅ Display Average Rating
+let ratingSection = document.getElementById("bookRating");
+if (!ratingSection) {
+    ratingSection = document.createElement("p");
+    ratingSection.id = "bookRating";
+    document.querySelector(".modal-content").insertBefore(ratingSection, document.getElementById("reviewsSection"));
+}
+ratingSection.innerHTML = `⭐ <strong>${book.averageRating || "N/A"}</strong> (${book.reviewCount || 0} reviews)`; // Use correct fields
+        // ✅ Fetch and display reviews
+        const reviews = await fetchReviews(book.id);
+    let reviewHtml = reviews.map(review => `<p><strong>${review.user_name}:</strong> ⭐${review.rating} - ${review.comment}</p>`).join("");
+    document.getElementById("reviewsSection").innerHTML = reviewHtml || "<p>No reviews yet.</p>";
+    // ✅ Check if the user has reviewed this book
+    try {
+        const response = await fetch(`/can-rate/${book.id}`, {
+            headers: { "Authorization": `Bearer ${token}` }
+        });
+        const data = await response.json();
+
+        const ratingForm = document.getElementById("ratingForm");
+        if (data.canRate || data.hasRated) {
+            ratingForm.style.display = "block";
+            document.getElementById("submitReviewBtn").onclick = () => submitReview(book.id);
+        } else {
+            ratingForm.style.display = "none";
+        }
+
+        // ✅ If user has already rated, pre-fill rating and comment
+        if (data.hasRated) {
+            const userReview = reviews.find(r => r.user_name === "Your Username"); // Adjust based on auth system
+            if (userReview) {
+                document.getElementById("ratingSelect").value = userReview.rating;
+                document.getElementById("ratingComment").value = userReview.comment;
+            }
+        }
+
+    } catch (error) {
+        console.error("❌ Error checking rating permission:", error);
+    }
+
+    // ✅ Enable Borrow Button
+    const borrowBtn = document.getElementById("borrowBtn");
+    if (book.isAvailable) { // Use correct field
+        borrowBtn.style.display = "block";
+        borrowBtn.innerText = `📖 Borrow This Book (${book.copies} left)`;
+    } else {
+        borrowBtn.style.display = "none";
+        borrowBtn.innerText = "🚫 No Copies Available";
+    }
+
+    borrowBtn.onclick = () => borrowBook(book.id);
+
+    document.getElementById("bookModal").style.display = "flex";
+}
+async function submitReview(bookId) {
+    const rating = document.getElementById("ratingSelect").value;
+    const comment = document.getElementById("ratingComment").value;
+
+    console.log("Submitting review:", { bookId, rating, comment });
+
+    if (!bookId || !rating || !comment.trim()) {
+        alert("Please fill in all fields before submitting your review.");
+        return;
+    }
+
+    const response = await fetch("/review", {
+        method: "POST",
+        headers: { "Authorization": `Bearer ${token}`, "Content-Type": "application/json" },
+        body: JSON.stringify({ bookId, rating, comment })
+    });
+
+    const data = await response.json();
+    alert(data.message);
+
+    // Refresh book details after submitting review
+    try {
+        const bookResponse = await fetch(`/books`);
+        if (!bookResponse.ok) throw new Error("Failed to fetch book details");
+
+        const books = await bookResponse.json();
+        const updatedBook = books.find(book => book.id === bookId);
+
+        if (updatedBook) {
+            openModal(updatedBook);
+        }
+    } catch (error) {
+        console.error("❌ Error fetching book data:", error);
+    }
+}
+
+
+        document.querySelector(".close").addEventListener("click", () => {
+            document.getElementById("bookModal").style.display = "none";
+        });
+        fetchBooks();
+        document.getElementById("sortBy").addEventListener("change", fetchBooks);
+        document.getElementById("filterBtn").addEventListener("click", fetchBooks);
+
+
+// ✅ Borrow a Book
+async function borrowBook(bookId) {
+    const response = await fetch("/borrow", {
+        method: "POST",
+        headers: {
+            "Authorization": `Bearer ${token}`,
+            "Content-Type": "application/json"
+        },
+        body: JSON.stringify({ bookId }) // Ensure bookId is sent correctly
+    });
+
+    const data = await response.json();
+    
+    if (data.error) {
+        alert(`❌ ${data.error}`);  // Show error if user already has the book
+    } else {
+        alert(`✅ ${data.message}`);
+        document.getElementById("bookModal").style.display = "none"; // Close modal
+        fetchBooks(); // Refresh book list
+    }
+}
+
+
+
+        // ✅ Close modal safely
+        document.querySelector(".close").addEventListener("click", () => {
+            document.getElementById("bookModal").style.display = "none";
+        });
+
+        // ✅ Logout functionality
+        document.getElementById("logoutBtn").addEventListener("click", function() {
+            localStorage.removeItem("token"); // Remove token
+            window.location.href = "/login.html"; // Redirect to login
+        });
+    </script>
+</body>
+</html>
