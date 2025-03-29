@@ -5,8 +5,10 @@ const path = require("path");
 const bcrypt = require("bcryptjs");
 const jwt = require("jsonwebtoken");
 require("dotenv").config();
+
 const sequelize = require("./models/sequelize");
 const authorRoutes = require("./routes/authorRoutes");
+
 
 const app = express();
 const PORT = 3000;
@@ -82,6 +84,7 @@ class EntityFactory {
       default:
         throw new Error(`Unknown entity type: ${type}`);
     }
+
   }
 }
 
@@ -210,6 +213,7 @@ class BookAdapter {
 app.get("/books", (req, res) => {
   const { sortBy = "title", order = "asc", title, author, genre, publisher } = req.query;
 
+
   let query = `
       SELECT book.id, book.title, 
              DATE_FORMAT(book.published_date, '%Y-%m-%d') AS published_date, 
@@ -255,6 +259,7 @@ app.get("/books", (req, res) => {
       GROUP BY book.id, book.title, book.published_date, book.copies, book.image_url, 
                book.description, genre.name, author.name, publisher.name
       ORDER BY ${sortClause};
+
   `;
 
   db.query(query, params, (err, results) => {
@@ -267,6 +272,7 @@ app.get("/books", (req, res) => {
       res.json(books);
   });
 });
+
 
 app.get("/genres", (req, res) => {
   const query = "SELECT DISTINCT name FROM genre ORDER BY name ASC";
@@ -288,6 +294,7 @@ app.get("/authors", (req, res) => {
   db.query("SELECT * FROM author", (err, results) => {
     if (err) return res.status(500).json({ error: "Database error" });
     res.json(results.map(row => EntityFactory.createEntity("Author", row)));
+
   });
 });
 // ✅ Check if the user can rate a book (only if they have borrowed or are reading it)
@@ -393,6 +400,7 @@ app.post("/reviews", (req, res) => {
     }
   );
 });
+
 
 
 // ✅ Command Pattern for Borrowing and Returning Books
@@ -513,6 +521,7 @@ app.post("/return", authenticateUser, async (req, res) => {
     res.status(400).json({ error });
   }
 });
+
 
 // ✅ Get user's borrowed books (both current and past) & reviews
 app.get("/profile", authenticateUser, (req, res) => {
@@ -646,6 +655,7 @@ bookObserver.subscribe((newBook) => {
 
 // Routes
 app.use("/authors", authorRoutes);
+
 
 // 📌 Start Server
 app.listen(PORT, () => {
